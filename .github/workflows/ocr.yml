@@ -1,0 +1,34 @@
+name: OCR worker
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: ozon-radar-ocr
+  cancel-in-progress: false
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: sudo apt-get update -qq && sudo apt-get install -y tesseract-ocr tesseract-ocr-rus
+      - run: pip install -r requirements.txt
+      - name: Validate parser
+        run: python -m unittest discover -s tests
+      - name: Process queue
+        env:
+          GAS_URL: ${{ secrets.GAS_URL }}
+          WORKER_KEY: ${{ secrets.WORKER_KEY }}
+        run: |
+          if [ -z "$GAS_URL" ] || [ -z "$WORKER_KEY" ]; then
+            echo "GAS secrets not configured; skipping queue."
+            exit 0
+          fi
+          python worker.py
