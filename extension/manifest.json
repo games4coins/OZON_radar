@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "OZON Radar — импорт накладных",
+  "version": "0.1.0",
+  "description": "Импорт доступных вам фото из разрешённой беседы VK в личную очередь OCR.",
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://vk.ru/*",
+    "https://vk.com/*",
+    "https://*.userapi.com/*",
+    "https://*.vkuserphoto.ru/*",
+    "https://*.vk-cdn.net/*",
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://vk.ru/im/convo/*",
+        "https://vk.com/im/convo/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
