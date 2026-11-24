@@ -1,0 +1,4 @@
+const $=id=>document.getElementById(id);
+chrome.storage.local.get(['config','last']).then(({config:c,last})=>{if(c){for(let k of ['peer','endpoint','key'])$(k).value=c[k]||'';$('watch').checked=!!c.watch}$('status').textContent=last||''});
+$('save').onclick=async()=>{const c={peer:$('peer').value.trim(),endpoint:$('endpoint').value.trim(),key:$('key').value.trim(),watch:$('watch').checked};if(!/^\d+$/.test(c.peer)||!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(c.endpoint)||!c.key){$('status').textContent='Проверьте настройки';return}await chrome.storage.local.set({config:c});$('status').textContent='Сохранено'};
+$('scan').onclick=async()=>{try{let [tab]=await chrome.tabs.query({active:true,currentWindow:true});let r=await chrome.tabs.sendMessage(tab.id,{type:'scan'});$('status').textContent=r.error||('Импортировано: '+r.count)}catch(e){$('status').textContent='Откройте разрешённую беседу и обновите страницу VK'}};
