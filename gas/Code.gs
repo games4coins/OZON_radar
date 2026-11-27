@@ -25,13 +25,39 @@ function setup(){
 }
 function sheet_(k){return SpreadsheetApp.openById(P.getProperty('SHEET_ID')).getSheetByName(k)}
 function rows_(k){return sheet_(k).getDataRange().getValues().slice(1)}
-function owner_(){const email=Session.getActiveUser().getEmail();if(!email||email!==P.getProperty('OWNER'))throw Error('Доступ только владельцу')}
+function email_(v){return String(v||'').trim().toLowerCase()}
+function authCode_(){
+ const owner=email_(P.getProperty('OWNER'));
+ if(!owner)return 'A01';
+ const email=email_(Session.getActiveUser().getEmail());
+ if(!email)return 'A02';
+ if(email!==owner)return 'A03';
+ return '';
+}
+function owner_(){const code=authCode_();if(code)throw Error('Доступ только владельцу ('+code+')')}
+// Run from the Apps Script editor. Reports only status, never email or keys.
+function diagnoseSetup(){
+ const result={version:'auth-fix-1',auth:authCode_()||'OK'};
+ for(const k of ['OWNER','SHEET_ID','FOLDER','UPLOAD_KEY','WORKER_KEY'])result[k]=Boolean(P.getProperty(k));
+ if(result.auth==='OK'){
+  try{const ss=SpreadsheetApp.openById(P.getProperty('SHEET_ID'));result.sheets=Object.keys(SCHEMA).every(k=>!!ss.getSheetByName(k))}catch(e){result.sheets=false}
+  try{DriveApp.getFolderById(P.getProperty('FOLDER')).getName();result.drive=true}catch(e){result.drive=false}
+  try{HtmlService.createHtmlOutputFromFile('Index');result.html=true}catch(e){result.html=false}
+ }
+ console.log(JSON.stringify(result));
+}
 function safe_(v){return typeof v==='string'&&/^[=+\-@\t\r]/.test(v)?"'"+v:v}
 function append_(k,a){sheet_(k).appendRow(a.map(safe_))}
 function lock_(f){let l=LockService.getScriptLock();l.waitLock(25000);try{return f()}finally{l.releaseLock()}}
 function out_(o){return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON)}
 function clean_(s,n){return String(s||'').slice(0,n||500)}
-function doGet(){try{owner_();return HtmlService.createHtmlOutputFromFile('Index').setTitle('OZON Radar')}catch(e){return HtmlService.createHtmlOutput('Доступ запрещён')}}
+function doGet(){
+ let code;
+ try{code=authCode_()}catch(e){code='A04'}
+ if(code)return HtmlService.createHtmlOutput('<h2>OZON Radar</h2><p>Доступ запрещён ('+code+').</p><p>Откройте личное развёртывание под Google-аккаунтом владельца.</p>').setTitle('OZON Radar');
+ try{return HtmlService.createHtmlOutputFromFile('Index').setTitle('OZON Radar')}
+ catch(e){console.error('Dashboard HTML could not be loaded');return HtmlService.createHtmlOutput('<h2>OZON Radar</h2><p>Авторизация успешна. Ошибка H01: не удалось открыть HTML-файл Index. Проверьте файл в редакторе Apps Script и создайте новую версию развёртывания.</p>').setTitle('OZON Radar')}
+}
 function doPost(e){try{const b=JSON.parse(e.postData.contents);if(b.action==='upload'&&b.key===P.getProperty('UPLOAD_KEY')&&b.key)return out_(ingest_(b));if(!b.key||b.key!==P.getProperty('WORKER_KEY'))return out_({ok:false,error:'Unauthorized'});if(b.action==='claim')return out_(claim_());if(b.action==='finish')return out_(finish_(b));if(b.action==='fail')return out_(fail_(b));return out_({ok:false,error:'Unknown action'})}catch(e){return out_({ok:false,error:'Request failed'})}}
 function ingest_(b){
  if(!b.data||b.data.length>14000000||!['image/jpeg','image/png','image/webp'].includes(b.mime))throw Error('Только JPG/PNG/WebP до 10 МБ');
